@@ -1,10 +1,5 @@
-// Mock Data: 나중에 /products API + MariaDB로 교체 예정
-let products = [
-    { barcode: "P001", name: "Logitech Keyboard", stock: 30, location: "A-01" },
-    { barcode: "P002", name: "Wireless Mouse", stock: 18, location: "B-02" },
-    { barcode: "P003", name: "USB-C Cable", stock: 75, location: "C-05" },
-    { barcode: "P008", name: "Monitor", stock: 3, location: "A-03-01" }
-];
+// MariaDB + products API /  교체 예정
+let products = [];
 
 let editIndex = null;
 
@@ -45,6 +40,13 @@ function renderProducts() {
         });
 }
 
+async function loadProducts() {
+	const response = await fetch("/products");
+	products = await response.json();
+	renderProducts();
+}
+
+
 function openAddModal() {
     editIndex = null;
 
@@ -78,7 +80,7 @@ function closeModal() {
     document.getElementById("productModal").style.display = "none";
 }
 
-function saveProduct() {
+async function saveProduct() {
     const barcode = document.getElementById("barcodeInput").value.trim();
     const name = document.getElementById("nameInput").value.trim();
     const stock = Number(document.getElementById("stockInput").value);
@@ -89,33 +91,61 @@ function saveProduct() {
         return;
     }
 
-    if (editIndex === null) {
-        const exists = products.some(product => product.barcode === barcode);
+    let url = "/products";
+    let method = "POST";
 
-        if (exists) {
-            alert("이미 존재하는 Barcode입니다.");
-            return;
-        }
+    if (editIndex !== null) {
+        url = "/products/" + barcode;
+        method = "PUT";
+    }
 
-        products.push({ barcode, name, stock, location });
-    } else {
-        products[editIndex].name = name;
-        products[editIndex].stock = stock;
-        products[editIndex].location = location;
+    const response = await fetch(url, {
+        method: method,
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            barcode: barcode,
+            name: name,
+            stock: stock,
+            location: location
+        })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+        alert(data.error);
+        return;
     }
 
     closeModal();
-    renderProducts();
+
+    // DB에서 다시 상품 목록 조회
+    loadProducts();
 }
 
-function deleteProduct(index) {
+async function deleteProduct(index) {
     const product = products[index];
 
-    if (confirm(`${product.name} 상품을 삭제할까요?`)) {
-        products.splice(index, 1);
-        renderProducts();
+    if (!confirm(`${product.name} 상품을 삭제할까요?`)) {
+        return;
     }
+
+    const response = await fetch("/products/" + product.barcode, {
+        method: "DELETE"
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+        alert(data.error);
+        return;
+    }
+
+    // DB에서 다시 상품 목록 조회
+    loadProducts();
 }
 
 // 페이지 로딩 시 상품 목록 표시
-renderProducts();
+loadProducts();
